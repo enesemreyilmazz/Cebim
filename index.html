@@ -581,13 +581,19 @@ function renderPaylasim(){
           <span class="kisi-item-amt" style="${odendi?'text-decoration:line-through':''}">${fmt(it.tutar)}</span>
         </div>`;
       }).join('')}</div>
-      <div class="temizle-btn" data-kisi="${kisi}">Tümünü temizle (ay bitti)</div>`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;">
+        <div class="temizle-btn" style="margin-top:0" data-kisi="${kisi}">Temizle</div>
+        <div class="temizle-btn" style="margin-top:0;border-color:rgba(37,211,102,0.4);color:#25d366;" data-wa="${kisi}">📲 WhatsApp</div>
+      </div>`
       :'<div style="font-size:12px;color:var(--text3);padding:4px 0">Bu ay aktarım yok</div>'}
     </div>`;
   });
   $('paylasim-area').innerHTML=html;
   document.querySelectorAll('[data-kisi]').forEach(el=>{
     el.addEventListener('click',function(){temizleKisi(mk,this.dataset.kisi);});
+  });
+  document.querySelectorAll('[data-wa]').forEach(el=>{
+    el.addEventListener('click',function(e){e.stopPropagation();waOzet(mk,this.dataset.wa);});
   });
   document.querySelectorAll('[data-sabitodendi]').forEach(el=>{
     el.addEventListener('click',function(e){
@@ -610,6 +616,30 @@ function temizleKisi(mk,kisi){
     D.aktarimlar[mk]['_sabit_'+kisi]=[];
     save();renderPaylasim();showToast('Temizlendi ✓');
   }
+}
+
+function waOzet(mk,kisi){
+  const aktarimlar=D.aktarimlar[mk]||{};
+  const dinamikItems=aktarimlar[kisi]||[];
+  const odenenSabit=aktarimlar['_sabit_'+kisi]||[];
+  const sabitItems=D.sabit.filter(s=>s.aktar&&s.aktar.kisi===kisi);
+  const ay=MONTHS[vm]+' '+vy;
+  let satirlar=[];
+  let toplam=0;
+  sabitItems.forEach(s=>{
+    const odendi=odenenSabit.includes(s.id);
+    satirlar.push(`${odendi?'✓':'•'} ${s.name}: ${fmt(s.aktar.tutar)}${odendi?' (ödendi)':''}`);
+    if(!odendi)toplam+=s.aktar.tutar;
+  });
+  dinamikItems.forEach(it=>{
+    satirlar.push(`• ${it.harcamaAd}: ${fmt(it.tutar)}`);
+    toplam+=it.tutar;
+  });
+  if(satirlar.length===0){showToast('Aktarım yok');return;}
+  const nl='\n';
+  const mesaj='Merhaba '+kisi+' 👋'+nl+nl+ay+' ayı harcama özeti:'+nl+nl+satirlar.join(nl)+nl+nl+'Toplam: '+fmt(toplam)+nl+nl+'_Cebim uygulaması ile gönderildi_';
+  const encoded=encodeURIComponent(mesaj);
+  window.open('https://wa.me/?text='+encoded,'_blank');
 }
 
 function toggleChk(mk,id){

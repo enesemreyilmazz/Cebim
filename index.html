@@ -638,8 +638,16 @@ function waOzet(mk,kisi){
   if(satirlar.length===0){showToast('Aktarım yok');return;}
   const nl='\n';
   const mesaj='Merhaba '+kisi+' 👋'+nl+nl+ay+' ayı harcama özeti:'+nl+nl+satirlar.join(nl)+nl+nl+'Toplam: '+fmt(toplam)+nl+nl+'_Cebim uygulaması ile gönderildi_';
-  const encoded=encodeURIComponent(mesaj);
-  window.open('https://wa.me/?text='+encoded,'_blank');
+  navigator.clipboard.writeText(mesaj).then(()=>{
+    showToast('Mesaj kopyalandı! WhatsApp'ta yapıştır 📋');
+  }).catch(()=>{
+    // fallback
+    const ta=document.createElement('textarea');
+    ta.value=mesaj;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');
+    document.body.removeChild(ta);
+    showToast('Mesaj kopyalandı! WhatsApp'ta yapıştır 📋');
+  });
 }
 
 function toggleChk(mk,id){

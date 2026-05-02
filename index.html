@@ -426,14 +426,33 @@ function calcT(){
   const ts=D.sabit.reduce((a,i)=>a+i.amount,0);
   const aktivTaksit=D.taksit.filter(t=>taksitKalan(t,vy,vm)>0);
   const tt=aktivTaksit.reduce((a,i)=>a+i.amount,0);
-  return{tg,th,ts,tt,net:tg-th-ts-tt};
+  // Sabit aktarimlarda odenenler geri ekle
+  let odenenGeri=0;
+  const aktarimlar=D.aktarimlar[mk]||{};
+  D.sabit.forEach(s=>{
+    if(s.aktar){
+      const key='_sabit_'+s.aktar.kisi;
+      const odenenler=aktarimlar[key]||[];
+      if(odenenler.includes(s.id))odenenGeri+=s.aktar.tutar;
+    }
+  });
+  // Harcama aktarimlarinda odenenler geri ekle
+  (D.harcama[mk]||[]).forEach(h=>{
+    if(h.aktar){
+      const odenenler=aktarimlar[h.aktar.kisi]||[];
+      const odendi=odenenler.find(a=>a.harcamaId===h.id&&a.odendi);
+      if(odendi)odenenGeri+=h.aktar.tutar;
+    }
+  });
+  return{tg,th,ts,tt,odenenGeri,net:tg-th-ts-tt+odenenGeri};
 }
 
 function renderSum(){
-  const{tg,th,ts,tt,net}=calcT();
+  const{tg,th,ts,tt,odenenGeri,net}=calcT();
+  const sabitGosterge=ts+tt-odenenGeri;
   $('sumbar').innerHTML=`
     <div class="sc"><div class="sl">Gelir</div><div class="sv g">${fmt(tg)}</div></div>
-    <div class="sc"><div class="sl">Sabit</div><div class="sv r">${fmt(ts+tt)}</div></div>
+    <div class="sc"><div class="sl">Sabit</div><div class="sv r">${fmt(sabitGosterge)}</div></div>
     <div class="sc"><div class="sl">Harcama</div><div class="sv r">${fmt(th)}</div></div>
     <div class="sc"><div class="sl">Kalan</div><div class="sv ${net>=0?'g':'r'}">${fmt(net)}</div></div>`;
 }

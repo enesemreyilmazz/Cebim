@@ -639,14 +639,14 @@ function waOzet(mk,kisi){
   const nl='\n';
   const mesaj='Merhaba '+kisi+' 👋'+nl+nl+ay+' ayı harcama özeti:'+nl+nl+satirlar.join(nl)+nl+nl+'Toplam: '+fmt(toplam)+nl+nl+'_Cebim uygulaması ile gönderildi_';
   navigator.clipboard.writeText(mesaj).then(()=>{
-    showToast('Mesaj kopyalandı! WhatsApp'ta yapıştır 📋');
+    showToast("Mesaj kopyalandı, WhatsApp'a yapıştır 📋");
   }).catch(()=>{
     // fallback
     const ta=document.createElement('textarea');
     ta.value=mesaj;ta.style.position='fixed';ta.style.opacity='0';
     document.body.appendChild(ta);ta.select();document.execCommand('copy');
     document.body.removeChild(ta);
-    showToast('Mesaj kopyalandı! WhatsApp'ta yapıştır 📋');
+    showToast("Mesaj kopyalandı, WhatsApp'a yapıştır 📋");
   });
 }
 

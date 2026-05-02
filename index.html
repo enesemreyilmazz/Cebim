@@ -7,7 +7,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Cebim">
-<title>index</title>
+<title>Cebim</title>
 <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-touch-callout:none;}
@@ -218,8 +218,9 @@ body{font-family:'Syne',sans-serif;color:#f0f0f0;font-size:14px;-webkit-font-smo
     <select class="fsel" id="f-gc"><option value="maas">Maaş</option><option value="serbest">Serbest / Freelance</option><option value="kira-gelir">Kira geliri</option><option value="diger">Diğer</option></select>
   </div>
   <div class="fg" id="fg-hc" style="display:none"><label class="fl">Kategori</label>
-    <select class="fsel" id="f-hc"><option value="market">Market / Yemek</option><option value="ulasim">Ulaşım</option><option value="eglence">Eğlence</option><option value="giyim">Giyim</option><option value="saglik">Sağlık</option><option value="diger">Diğer</option></select>
+    <select class="fsel" id="f-hc" onchange="toggleNot(this.value)"><option value="market">Market / Yemek</option><option value="ulasim">Ulaşım</option><option value="eglence">Eğlence</option><option value="giyim">Giyim</option><option value="saglik">Sağlık</option><option value="diger">Diğer</option></select>
   </div>
+  <div class="fg" id="fg-not" style="display:none"><label class="fl">Ne için? (not)</label><input class="fi" id="f-not" type="text" placeholder="Örn: araba tamiri, hediye..." autocomplete="off" autocorrect="off"></div>
   <div class="mbtns">
     <div class="bcnl" id="btn-cancel">İptal</div>
     <div class="bsv" id="btn-save">Kaydet</div>
@@ -433,7 +434,7 @@ function gcard(item){
 
 function hcard(item){
   const col=CCOL[item.cat]||'#606068';
-  return `<div class="card"><div class="dot" style="background:${col}"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bx">${CLBL[item.cat]||item.cat}</span></div></div><div class="cr"><div class="ca m">-${fmt(item.amount)}</div><div class="dbtn" data-delm="harcama" data-id="${item.id}">✕</div></div></div>`;
+  return `<div class="card"><div class="dot" style="background:${col}"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bx">${CLBL[item.cat]||item.cat}</span>${item.not?`<span class="bdg bx" style="color:var(--text2)">${item.not}</span>`:''}</div></div><div class="cr"><div class="ca m">-${fmt(item.amount)}</div><div class="dbtn" data-delm="harcama" data-id="${item.id}">✕</div></div></div>`;
 }
 
 function delItem(type,id){D[type]=D[type].filter(i=>i.id!==id);save();render();}
@@ -470,7 +471,7 @@ function openModal(type){
 }
 
 function clearForm(){
-  ['f-name','f-amount','f-gun','f-kalan','f-kisi'].forEach(id=>{const el=$(id);if(el)el.value='';});
+  ['f-name','f-amount','f-gun','f-kalan','f-kisi','f-not'].forEach(id=>{const el=$(id);if(el)el.value='';});
 }
 
 function setType(type){
@@ -487,6 +488,11 @@ function updateFields(type){
   show('fg-gun',type==='sabit'||type==='taksit'||type==='borc');
   show('fg-gc',type==='gelir');
   show('fg-hc',type==='harcama');
+  show('fg-not',false);
+}
+function toggleNot(val){
+  const el=$('fg-not');if(el)el.style.display=val==='diger'?'block':'none';
+  if(val!=='diger'){const n=$('f-not');if(n)n.value='';}
 }
 
 function closeMain(){hideSheet('sheet-main','ov-main');quickAdd=false;}
@@ -501,7 +507,7 @@ function saveItem(){
   else if(curType==='taksit'){D.taksit.push({id,name,amount,cat:$('f-cat').value,kalan:parseInt($('f-kalan').value)||12,gun});}
   else if(curType==='borc'){D.borc.push({id,name,amount,kisi:$('f-kisi').value,gun});}
   else if(curType==='gelir'){const mk=mkey(vy,vm);if(!D.gelir[mk])D.gelir[mk]=[];D.gelir[mk].push({id,name,amount,cat:$('f-gc').value});}
-  else if(curType==='harcama'){const mk=mkey(vy,vm);if(!D.harcama[mk])D.harcama[mk]=[];D.harcama[mk].push({id,name,amount,cat:$('f-hc').value});}
+  else if(curType==='harcama'){const mk=mkey(vy,vm);if(!D.harcama[mk])D.harcama[mk]=[];const not=$('f-not').value.trim();D.harcama[mk].push({id,name,amount,cat:$('f-hc').value,not:not||null});}
   save();closeMain();render();showToast('Kaydedildi ✓');
 }
 

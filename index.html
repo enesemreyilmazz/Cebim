@@ -379,6 +379,9 @@ function renderOdemeler(){
   document.querySelectorAll('[data-delm]').forEach(el=>{
     el.addEventListener('click',function(e){e.stopPropagation();delMonth(this.dataset.delm,this.dataset.id);});
   });
+  document.querySelectorAll('[data-edit]').forEach(el=>{
+    el.addEventListener('click',function(){openEdit(this.dataset.edit,this.dataset.id);});
+  });
 }
 
 function renderGG(){
@@ -390,6 +393,9 @@ function renderGG(){
   $('lharcama').innerHTML=hl.length?hl.map(hcard).join(''):'<div class="empty">Bu ay harcama girilmedi</div>';
   document.querySelectorAll('[data-delm]').forEach(el=>{
     el.addEventListener('click',function(e){e.stopPropagation();delMonth(this.dataset.delm,this.dataset.id);});
+  });
+  document.querySelectorAll('[data-edit]').forEach(el=>{
+    el.addEventListener('click',function(){openEdit(this.dataset.edit,this.dataset.id);});
   });
 }
 
@@ -425,20 +431,47 @@ function icard(item,type,del){
   if(type==='borc'&&item.kisi)bdg+=`<span class="bdg bb">${item.kisi}</span>`;
   if(lbl)bdg+=`<span class="bdg bx">${lbl}</span>`;
   if(item.gun)bdg+=`<span class="bdg bx">${item.gun}. gün</span>`;
-  return `<div class="card"><div class="dot" style="background:${col}"></div><div class="ci"><div class="cn">${item.name}</div>${bdg?`<div class="cm">${bdg}</div>`:''}</div><div class="cr"><div class="ca m">-${fmt(item.amount)}</div>${del?`<div class="dbtn" data-del="${type}" data-id="${item.id}">✕</div>`:''}</div></div>`;
+  return `<div class="card" data-edit="${type}" data-id="${item.id}" style="cursor:pointer"><div class="dot" style="background:${col}"></div><div class="ci"><div class="cn">${item.name}</div>${bdg?`<div class="cm">${bdg}</div>`:''}</div><div class="cr"><div class="ca m">-${fmt(item.amount)}</div>${del?`<div class="dbtn" data-del="${type}" data-id="${item.id}">✕</div>`:''}</div></div>`;
 }
 
 function gcard(item){
-  return `<div class="card"><div class="dot" style="background:var(--green)"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bg">${CLBL[item.cat]||item.cat}</span></div></div><div class="cr"><div class="ca p">+${fmt(item.amount)}</div><div class="dbtn" data-delm="gelir" data-id="${item.id}">✕</div></div></div>`;
+  return `<div class="card" data-edit="gelir" data-id="${item.id}" style="cursor:pointer"><div class="dot" style="background:var(--green)"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bg">${CLBL[item.cat]||item.cat}</span></div></div><div class="cr"><div class="ca p">+${fmt(item.amount)}</div><div class="dbtn" data-delm="gelir" data-id="${item.id}">✕</div></div></div>`;
 }
 
 function hcard(item){
   const col=CCOL[item.cat]||'#606068';
-  return `<div class="card"><div class="dot" style="background:${col}"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bx">${CLBL[item.cat]||item.cat}</span>${item.not?`<span class="bdg bx" style="color:var(--text2)">${item.not}</span>`:''}</div></div><div class="cr"><div class="ca m">-${fmt(item.amount)}</div><div class="dbtn" data-delm="harcama" data-id="${item.id}">✕</div></div></div>`;
+  return `<div class="card" data-edit="harcama" data-id="${item.id}" style="cursor:pointer"><div class="dot" style="background:${col}"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bx">${CLBL[item.cat]||item.cat}</span>${item.not?`<span class="bdg bx" style="color:var(--text2)">${item.not}</span>`:''}</div></div><div class="cr"><div class="ca m">-${fmt(item.amount)}</div><div class="dbtn" data-delm="harcama" data-id="${item.id}">✕</div></div></div>`;
 }
 
 function delItem(type,id){D[type]=D[type].filter(i=>i.id!==id);save();render();}
 function delMonth(type,id){const mk=mkey(vy,vm);if(D[type][mk])D[type][mk]=D[type][mk].filter(i=>i.id!==id);save();render();}
+
+function openEdit(type,id){
+  let item=null;
+  if(type==='gelir'||type==='harcama'){const mk=mkey(vy,vm);item=(D[type][mk]||[]).find(i=>i.id===id);}
+  else{item=D[type].find(i=>i.id===id);}
+  if(!item)return;
+  editingId=id;editingType=type;
+  quickAdd=false;
+  $('tychsr-area').style.display='none';
+  const titles={sabit:'Düzenle',taksit:'Düzenle',borc:'Düzenle',gelir:'Düzenle',harcama:'Düzenle'};
+  $('sheet-title').textContent='✏️ Düzenle';
+  curType=type;
+  updateFields(type);
+  $('f-name').value=item.name||'';
+  $('f-amount').value=item.amount||'';
+  $('f-gun').value=item.gun||'';
+  $('f-kalan').value=item.kalan||'';
+  $('f-kisi').value=item.kisi||'';
+  $('f-not').value=item.not||'';
+  if(type==='sabit'||type==='taksit'){$('f-cat').value=item.cat||'diger';}
+  if(type==='gelir'){$('f-gc').value=item.cat||'maas';}
+  if(type==='harcama'){$('f-hc').value=item.cat||'diger';toggleNot(item.cat);}
+  $('btn-save').textContent='Güncelle';
+  showSheet('sheet-main','ov-main');
+}
+
+let editingId=null,editingType=null;
 
 // MODAL
 function showSheet(id,ovId){
@@ -495,14 +528,38 @@ function toggleNot(val){
   if(val!=='diger'){const n=$('f-not');if(n)n.value='';}
 }
 
-function closeMain(){hideSheet('sheet-main','ov-main');quickAdd=false;}
+function closeMain(){hideSheet('sheet-main','ov-main');quickAdd=false;editingId=null;editingType=null;$('btn-save').textContent='Kaydet';}
 
 function saveItem(){
   const name=$('f-name').value.trim();
   const amount=parseFloat($('f-amount').value);
   if(!name||!amount||amount<=0)return;
-  const id=uid();
   const gun=parseInt($('f-gun').value)||null;
+  // EDIT MODE
+  if(editingId){
+    const type=editingType;
+    if(type==='sabit'||type==='taksit'||type==='borc'){
+      const idx=D[type].findIndex(i=>i.id===editingId);
+      if(idx>-1){
+        if(type==='sabit')D[type][idx]={...D[type][idx],name,amount,cat:$('f-cat').value,gun};
+        else if(type==='taksit')D[type][idx]={...D[type][idx],name,amount,cat:$('f-cat').value,kalan:parseInt($('f-kalan').value)||D[type][idx].kalan,gun};
+        else if(type==='borc')D[type][idx]={...D[type][idx],name,amount,kisi:$('f-kisi').value,gun};
+      }
+    } else {
+      const mk=mkey(vy,vm);
+      const arr=D[type][mk]||[];
+      const idx=arr.findIndex(i=>i.id===editingId);
+      if(idx>-1){
+        if(type==='gelir')arr[idx]={...arr[idx],name,amount,cat:$('f-gc').value};
+        else if(type==='harcama'){const not=$('f-not').value.trim();arr[idx]={...arr[idx],name,amount,cat:$('f-hc').value,not:not||null};}
+        D[type][mk]=arr;
+      }
+    }
+    save();closeMain();render();showToast('Güncellendi ✓');
+    return;
+  }
+  // NEW MODE
+  const id=uid();
   if(curType==='sabit'){D.sabit.push({id,name,amount,cat:$('f-cat').value,gun});}
   else if(curType==='taksit'){D.taksit.push({id,name,amount,cat:$('f-cat').value,kalan:parseInt($('f-kalan').value)||12,gun});}
   else if(curType==='borc'){D.borc.push({id,name,amount,kisi:$('f-kisi').value,gun});}

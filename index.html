@@ -234,6 +234,13 @@ body{font-family:'Syne',sans-serif;color:#f0f0f0;font-size:14px;-webkit-font-smo
   </div>
   <div class="fg"><label class="fl">Ad</label><input class="fi" id="f-name" type="text" placeholder="Netflix, Kira, Ahmet..." autocomplete="off" autocorrect="off"></div>
   <div class="fg"><label class="fl">Tutar (₺)</label><input class="fi" id="f-amount" type="number" inputmode="decimal" placeholder="0" autocomplete="off"></div>
+  <div class="fg" id="fg-tarih" style="display:none">
+    <label class="fl">Tarih</label>
+    <div style="display:flex;gap:6px;">
+      <input class="fi" id="f-gun-tarih" type="number" inputmode="numeric" placeholder="Gün (1-31)" min="1" max="31" autocomplete="off" style="flex:1">
+      <div class="bsv" id="btn-bugun" style="padding:13px 12px;white-space:nowrap;font-size:12px;">Bugün</div>
+    </div>
+  </div>
   <div class="fg" id="fg-cat"><label class="fl">Kategori</label>
     <select class="fsel" id="f-cat">
       <option value="fatura">Fatura</option><option value="abonelik">Abonelik</option>
@@ -362,6 +369,26 @@ function load(){
       D={...D,...parsed};
       if(!D.kisiler)D.kisiler=[];
       if(!D.aktarimlar)D.aktarimlar={};
+      return;
+    }
+    // Eski versiyonlardan otomatik tasima
+    for(const ek of ['cebim_v2','cebim_v1']){
+      const eski=localStorage.getItem(ek);
+      if(eski){
+        const parsed=JSON.parse(eski);
+        D={...D,...parsed};
+        if(!D.kisiler)D.kisiler=[];
+        if(!D.aktarimlar)D.aktarimlar={};
+        D.taksit=D.taksit.map(t=>{
+          if(!t.createdYear){
+            const now=new Date();
+            return{...t,kalanBase:t.kalan||t.kalanBase||12,createdYear:now.getFullYear(),createdMonth:now.getMonth()};
+          }
+          return t;
+        });
+        save();
+        break;
+      }
     }
   }catch(e){}
 }
@@ -509,9 +536,17 @@ function renderPaylasim(){
     return;
   }
   let html='';
+  // Sabit odemelerden bu kisi icin aktarim var mi
   D.kisiler.forEach(kisi=>{
-    const items=aktarimlar[kisi]||[];
-    const total=items.reduce((a,i)=>a+i.tutar,0);
+    const dinamikItems=aktarimlar[kisi]||[];
+    // Sabit odemelerden gelen aktarimlar
+    const sabitItems=D.sabit.filter(s=>s.aktar&&s.aktar.kisi===kisi).map(s=>({
+      harcamaAd:s.name+' (sabit)',tutar:s.aktar.tutar,sabitId:s.id
+    }));
+    const odenenSabit=(D.aktarimlar[mk]&&D.aktarimlar[mk]['_sabit_'+kisi])||[];
+    const allItems=[...sabitItems,...dinamikItems];
+    const odenmeyen=allItems.filter(i=>!i.sabitId||!odenenSabit.includes(i.sabitId));
+    const total=odenmeyen.reduce((a,i)=>a+i.tutar,0);
     const initials=kisi.slice(0,2).toUpperCase();
     html+=`<div class="kisi-card">
       <div class="kisi-header">
@@ -519,12 +554,15 @@ function renderPaylasim(){
         <div class="kisi-name">${kisi}</div>
         <div class="kisi-total">${fmt(total)}</div>
       </div>
-      ${items.length>0?`<div class="kisi-items">${items.map(it=>`
-        <div class="kisi-item">
-          <span class="kisi-item-name">${it.harcamaAd}</span>
-          <span class="kisi-item-amt">${fmt(it.tutar)}</span>
-        </div>`).join('')}</div>
-        <div class="temizle-btn" data-kisi="${kisi}">✓ Ödendi, temizle</div>`
+      ${allItems.length>0?`<div class="kisi-items">${allItems.map(it=>{
+        const odendi=it.sabitId&&odenenSabit.includes(it.sabitId);
+        return `<div class="kisi-item" style="${odendi?'opacity:0.45':''}">
+          <span class="kisi-item-name">${odendi?'✓ ':' '}${it.harcamaAd}</span>
+          ${it.sabitId&&!odendi?`<div class="dbtn" style="font-size:11px;color:var(--green);width:auto;padding:0 6px;" data-sabitodendi="${it.sabitId}" data-kisi="${kisi}">Ödendi</div>`:''}
+          <span class="kisi-item-amt" style="${odendi?'text-decoration:line-through':''}">${fmt(it.tutar)}</span>
+        </div>`;
+      }).join('')}</div>
+      <div class="temizle-btn" data-kisi="${kisi}">Tümünü temizle (ay bitti)</div>`
       :'<div style="font-size:12px;color:var(--text3);padding:4px 0">Bu ay aktarım yok</div>'}
     </div>`;
   });
@@ -532,12 +570,25 @@ function renderPaylasim(){
   document.querySelectorAll('[data-kisi]').forEach(el=>{
     el.addEventListener('click',function(){temizleKisi(mk,this.dataset.kisi);});
   });
+  document.querySelectorAll('[data-sabitodendi]').forEach(el=>{
+    el.addEventListener('click',function(e){
+      e.stopPropagation();
+      const sid=this.dataset.sabitodendi;
+      const kisi=this.dataset.kisi;
+      if(!D.aktarimlar[mk])D.aktarimlar[mk]={};
+      const key='_sabit_'+kisi;
+      if(!D.aktarimlar[mk][key])D.aktarimlar[mk][key]=[];
+      if(!D.aktarimlar[mk][key].includes(sid))D.aktarimlar[mk][key].push(sid);
+      save();renderPaylasim();showToast('Ödendi ✓');
+    });
+  });
 }
 
 function temizleKisi(mk,kisi){
-  if(confirm(`${kisi} ödedi mi? Aktarımlar sıfırlansın mı?`)){
+  if(confirm(`${kisi} ile bu ayki aktarımlar temizlensin mi?`)){
     if(!D.aktarimlar[mk])D.aktarimlar[mk]={};
     D.aktarimlar[mk][kisi]=[];
+    D.aktarimlar[mk]['_sabit_'+kisi]=[];
     save();renderPaylasim();showToast('Temizlendi ✓');
   }
 }
@@ -555,18 +606,22 @@ function icard(item,type,del){
   if(type==='borc'&&item.kisi)bdg+=`<span class="bdg bb">${item.kisi}</span>`;
   if(lbl)bdg+=`<span class="bdg bx">${lbl}</span>`;
   if(item.gun)bdg+=`<span class="bdg bx">${item.gun}. gün</span>`;
+  if(item.aktar)bdg+=`<span class="bdg bp">→ ${item.aktar.kisi}: ${fmt(item.aktar.tutar)}</span>`;
   return `<div class="card" data-edit="${type}" data-id="${item.id}"><div class="dot" style="background:${col}"></div><div class="ci"><div class="cn">${item.name}</div>${bdg?`<div class="cm">${bdg}</div>`:''}</div><div class="cr"><div class="ca m">-${fmt(item.amount)}</div>${del?`<div class="dbtn" data-del="${type}" data-id="${item.id}">✕</div>`:''}</div></div>`;
 }
 
+function fmtGun(gun,y,m){if(!gun)return '';return gun+' '+['Oca','Şub','Mar','Nis','May','Haz','Tem','Ağu','Eyl','Eki','Kas','Ara'][m];}
 function gcard(item){
-  return `<div class="card" data-edit="gelir" data-id="${item.id}"><div class="dot" style="background:var(--green)"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bg">${CLBL[item.cat]||item.cat}</span></div></div><div class="cr"><div class="ca p">+${fmt(item.amount)}</div><div class="dbtn" data-delm="gelir" data-id="${item.id}">✕</div></div></div>`;
+  const tarih=item.gun?fmtGun(item.gun,vy,vm):'';
+  return `<div class="card" data-edit="gelir" data-id="${item.id}"><div class="dot" style="background:var(--green)"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bg">${CLBL[item.cat]||item.cat}</span>${tarih?`<span class="bdg bx">${tarih}</span>`:''}</div></div><div class="cr"><div class="ca p">+${fmt(item.amount)}</div><div class="dbtn" data-delm="gelir" data-id="${item.id}">✕</div></div></div>`;
 }
 
 function hcard(item){
   const col=CCOL[item.cat]||'#606068';
   let extra='';
   if(item.aktar){extra+=`<span class="bdg bp">→ ${item.aktar.kisi}: ${fmt(item.aktar.tutar)}</span>`;}
-  return `<div class="card" data-edit="harcama" data-id="${item.id}"><div class="dot" style="background:${col}"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bx">${CLBL[item.cat]||item.cat}</span>${item.not?`<span class="bdg bx">${item.not}</span>`:''}${extra}</div></div><div class="cr"><div class="ca m">-${fmt(item.amount)}</div><div class="dbtn" data-delm="harcama" data-id="${item.id}">✕</div></div></div>`;
+  const tarih=item.gun?fmtGun(item.gun,vy,vm):'';
+  return `<div class="card" data-edit="harcama" data-id="${item.id}"><div class="dot" style="background:${col}"></div><div class="ci"><div class="cn">${item.name}</div><div class="cm"><span class="bdg bx">${CLBL[item.cat]||item.cat}</span>${tarih?`<span class="bdg bx">${tarih}</span>`:''}${item.not?`<span class="bdg bx">${item.not}</span>`:''}${extra}</div></div><div class="cr"><div class="ca m">-${fmt(item.amount)}</div><div class="dbtn" data-delm="harcama" data-id="${item.id}">✕</div></div></div>`;
 }
 
 function delItem(type,id){D[type]=D[type].filter(i=>i.id!==id);save();render();}
@@ -618,7 +673,7 @@ function openModal(type){
 }
 
 function clearForm(){
-  ['f-name','f-amount','f-gun','f-kalan','f-kisi','f-not','f-aktar-tutar'].forEach(id=>{const el=$(id);if(el)el.value='';});
+  ['f-name','f-amount','f-gun','f-kalan','f-kisi','f-not','f-aktar-tutar','f-gun-tarih'].forEach(id=>{const el=$(id);if(el)el.value='';});
   aktarToggle=false;aktarSec='yari';
   const tog=$('aktar-toggle');if(tog)tog.classList.remove('on');
   const ad=$('aktar-detay');if(ad)ad.style.display='none';
@@ -642,8 +697,9 @@ function updateFields(type){
   show('fg-gc',type==='gelir');
   show('fg-hc',type==='harcama');
   show('fg-not',false);
-  show('fg-aktar-wrap',type==='harcama'&&D.kisiler&&D.kisiler.length>0);
-  if(type==='harcama'&&D.kisiler&&D.kisiler.length>0){
+  show('fg-tarih',type==='gelir'||type==='harcama');
+  show('fg-aktar-wrap',(type==='harcama'||type==='sabit')&&D.kisiler&&D.kisiler.length>0);
+  if((type==='harcama'||type==='sabit')&&D.kisiler&&D.kisiler.length>0){
     const sel=$('f-aktar-kisi');
     if(sel){sel.innerHTML=D.kisiler.map(k=>`<option value="${k}">${k}</option>`).join('');}
   }
@@ -711,17 +767,28 @@ function saveItem(){
   }
 
   const id=uid();
-  if(curType==='sabit'){D.sabit.push({id,name,amount,cat:$('f-cat').value,gun});}
+  if(curType==='sabit'){
+    let aktarSabitObj=null;
+    if(aktarToggle&&D.kisiler&&D.kisiler.length>0){
+      const kisi=$('f-aktar-kisi').value;
+      let tutar=0;
+      if(aktarSec==='yari')tutar=amount/2;
+      else if(aktarSec==='tam')tutar=amount;
+      else tutar=parseFloat($('f-aktar-tutar').value)||0;
+      if(tutar>0)aktarSabitObj={kisi,tutar};
+    }
+    D.sabit.push({id,name,amount,cat:$('f-cat').value,gun,aktar:aktarSabitObj});
+  }
   else if(curType==='taksit'){
     const kalanBase=parseInt($('f-kalan').value)||12;
     D.taksit.push({id,name,amount,cat:$('f-cat').value,kalanBase,gun,createdYear:vy,createdMonth:vm});
   }
   else if(curType==='borc'){D.borc.push({id,name,amount,kisi:$('f-kisi').value,gun});}
-  else if(curType==='gelir'){if(!D.gelir[mk])D.gelir[mk]=[];D.gelir[mk].push({id,name,amount,cat:$('f-gc').value});}
+  else if(curType==='gelir'){if(!D.gelir[mk])D.gelir[mk]=[];const gun=parseInt($('f-gun-tarih').value)||new Date().getDate();D.gelir[mk].push({id,name,amount,cat:$('f-gc').value,gun});}
   else if(curType==='harcama'){
     if(!D.harcama[mk])D.harcama[mk]=[];
     const not=$('f-not').value.trim();
-    D.harcama[mk].push({id,name,amount,cat:$('f-hc').value,not:not||null,aktar:aktarObj});
+    const gun=parseInt($('f-gun-tarih').value)||new Date().getDate();D.harcama[mk].push({id,name,amount,cat:$('f-hc').value,not:not||null,aktar:aktarObj,gun});
     if(aktarObj){
       if(!D.aktarimlar[mk])D.aktarimlar[mk]={};
       if(!D.aktarimlar[mk][aktarObj.kisi])D.aktarimlar[mk][aktarObj.kisi]=[];
@@ -755,6 +822,8 @@ function openEdit(type,id){
 
 // AKTAR TOGGLE
 function bindAktarEvents(){
+  const bb=$('btn-bugun');
+  if(bb)bb.addEventListener('click',()=>{const el=$('f-gun-tarih');if(el)el.value=new Date().getDate();});
   const tog=$('aktar-toggle');
   if(tog){tog.addEventListener('click',function(){
     aktarToggle=!aktarToggle;
